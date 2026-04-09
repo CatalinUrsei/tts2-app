@@ -1,0 +1,126 @@
+<script>
+
+let voices = [];
+let stealthMode = false;
+
+let audioCtx;
+let source;
+let gainNode;
+let filterNode;
+let compressor;
+
+function loadVoices() {
+  voices = speechSynthesis.getVoices();
+  const select = document.getElementById("voices");
+
+  select.innerHTML = "";
+
+  voices.forEach((v, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = v.name + " (" + v.lang + ")";
+    select.appendChild(opt);
+  });
+}
+
+speechSynthesis.onvoiceschanged = loadVoices;
+
+function speak() {
+
+  const text = document.getElementById("text").value;
+  const voiceIndex = document.getElementById("voices").value;
+
+  speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+
+  utterance.voice = voices[voiceIndex];
+
+  // base settings
+  utterance.pitch = stealthMode ? 0.6 : parseFloat(document.getElementById("pitch").value);
+  utterance.rate = parseFloat(document.getElementById("rate").value);
+  utterance.volume = parseFloat(document.getElementById("volume").value);
+
+  speechSynthesis.speak(utterance);
+
+  // apply audio FX (stealth simulation)
+  setTimeout(() => {
+    if (stealthMode) applyStealthFX();
+  }, 200);
+}
+
+function stop() {
+  speechSynthesis.cancel();
+  removeFX();
+}
+
+/* ---------------- STEALTH ENGINE ---------------- */
+
+function toggleStealth() {
+  stealthMode = !stealthMode;
+
+  const btn = document.getElementById("stealthBtn");
+
+  if (stealthMode) {
+    btn.innerText = "🟢 Voce ascunsă ACTIVĂ";
+    btn.style.background = "#ef4444";
+  } else {
+    btn.innerText = "🕵️ Ascunde vocea";
+    btn.style.background = "#3b82f6";
+    removeFX();
+  }
+}
+
+function initAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function applyStealthFX() {
+
+  initAudioContext();
+
+  try {
+    const audio = new Audio();
+
+    source = audioCtx.createMediaElementSource(audio);
+
+    // LOW PASS FILTER (reduce clarity -> anonim effect)
+    filterNode = audioCtx.createBiquadFilter();
+    filterNode.type = "lowpass";
+    filterNode.frequency.value = 900;
+
+    // COMPRESSOR (broadcast style)
+    compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.value = -20;
+    compressor.knee.value = 30;
+    compressor.ratio.value = 12;
+    compressor.attack.value = 0.01;
+    compressor.release.value = 0.25;
+
+    // GAIN (slight reduction)
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.85;
+
+    source
+      .connect(filterNode)
+      .connect(compressor)
+      .connect(gainNode)
+      .connect(audioCtx.destination);
+
+  } catch (e) {
+    console.log("FX not supported in this browser");
+  }
+}
+
+function removeFX() {
+  try {
+    if (source) source.disconnect();
+    if (filterNode) filterNode.disconnect();
+    if (compressor) compressor.disconnect();
+    if (gainNode) gainNode.disconnect();
+  } catch (e) {}
+}
+
+</script>
